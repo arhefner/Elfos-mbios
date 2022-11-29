@@ -13,6 +13,7 @@
 ;  You should have received a copy of the GNU General Public License
 ;  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#include opcodes.def
 
             ; Hardware and Build Target Definitions
 
@@ -21,6 +22,27 @@
 #define IDE_SETTLE     500              ; milliseconds delay before booting
 #define UART_DETECT                     ; use uart if no bit-bang cable
 #define INIT_CON                        ; initialize console before booting
+
+#ifdef 1802MAX
+  #define BRMK         bn2              ; branch on serial mark
+  #define BRSP         b2               ; branch on serial space
+  #define SEMK         req              ; set serial mark
+  #define SESP         seq              ; set serial space
+  #define EXP_PORT     5                ; group i/o expander port
+  #define EXP_MEMORY                    ; enable expansion memory
+  #define MICRO_SD
+  #define SPI_GROUP    0                ; spi interface group
+  #define SPI_CTL      2                ; spi interface control port
+  #define SPI_DATA     3                ; spi interface data port
+  #define RTC_GROUP    0                ; real time clock group
+  #define RTC_PORT     1                ; real time clock port
+  #define UART_GROUP   0                ; uart port group
+  #define UART_DATA    6                ; uart data port
+  #define UART_STATUS  7                ; uart status/command port
+  #define FAST_UART
+  #define SET_BAUD     38400            ; bit-bang serial fixed baud rate
+  #define FREQ_KHZ     4000             ; default processor clock frequency
+#endif
 
 #ifdef 1802MINI
   #define BRMK         bn2              ; branch on serial mark
@@ -485,8 +507,8 @@ scnwait:    glo   re                    ; wait until value just written
 
             lbr   bootpg+0100h
 
-          #if $ > 0f800h
-            #error Page F700 overflow
+          #if $ > 0f700h
+            #error Page F600 overflow
           #endif
 
             org   0f700h
@@ -930,7 +952,18 @@ alphatst:   sdi   'Z'-'A'               ; if Z or less, yes
 alpharet:   glo   re                    ; restore and return
             sep   sret
 
-           
+#ifdef FAST_UART
+
+; Output character through the 1854 UART if baud rate in RE.1 is zero by
+; jumping to UTYPE54, or through bit-banged port otherwise.
+
+type:       ghi   re
+            shr
+            lbnz  btype
+            lbr   utype
+
+#endif
+
           #if $ > 0f900h
             #error Page F800 overflow
           #endif
@@ -1249,13 +1282,25 @@ numtest:    sdi   '9'-'0'
 numret:     glo   re                    ; restore and return
             sep   sret
 
- 
+#ifdef FAST_UART
+
+; READ54 inputs character from the 1854 UART by jumping to UREAD54 if baud
+; rate in RE.1 is set to zero, and from the bit-banged UART otherwise.
+
+read:       ghi   re
+            shr
+            lbnz  bread
+            lbr   uread
+
+#endif 
 
           #if $ > 0fa00h
             #error Page F900 overflow
           #endif
 
             org   0fa00h
+
+#ifndef MICRO_SD
 
             ; Bits in CF interface address port
 
@@ -1560,35 +1605,274 @@ ideboot:    sep   scall                 ; initialize ide drive
 
             lbr   bootpg+6              ; jump to entry point
 
+#else
 
-            ; Return the address of the last byte of RAM. This returns the
-            ; RAM size that was discovered at boot rather than discovering
-            ; each time or having a built-in value. As a side effect, this
-            ; also updates the kernel variable containing the processor clock
-            ; frequency since there is no other way for that to happen
-            ; currently and this is a way to make it happen at start-up.
+#define SD_INIT_TIMEOUT                 2000
+#define SD_ERASE_TIMEOUT                100000
+#define SD_READ_TIMEOUT                 300
+#define SD_WRITE_TIMEOUT                600
 
-freemem:    ghi   re                    ; we only need to half-save for temp
-            stxd
+#define SD_CARD_ERROR_CMD0               01h
+#define SD_CARD_ERROR_CMD8               02h
+#define SD_CARD_ERROR_CMD17              03h
+#define SD_CARD_ERROR_CMD24              04h
+#define SD_CARD_ERROR_CMD25              05h
+#define SD_CARD_ERROR_CMD58              06h
+#define SD_CARD_ERROR_ACMD23             07h
+#define SD_CARD_ERROR_ACMD41             08h
+#define SD_CARD_ERROR_BAD_CSD            09h
+#define SD_CARD_ERROR_ERASE              0ah
+#define SD_CARD_ERROR_ERASE_SINGLE_BLOCK 0bh
+#define SD_CARD_ERROR_ERASE_TIMEOUT      0ch
+#define SD_CARD_ERROR_READ               0dh
+#define SD_CARD_ERROR_READ_REG           0eh
+#define SD_CARD_ERROR_READ_TIMEOUT       0fh
+#define SD_CARD_ERROR_STOP_TRAN          10h
+#define SD_CARD_ERROR_WRITE              11h
+#define SD_CARD_ERROR_WRITE_BLOCK_ZERO   12h
+#define SD_CARD_ERROR_WRITE_MULTIPLE     13h
+#define SD_CARD_ERROR_WRITE_PROGRAMMING  14h
+#define SD_CARD_ERROR_WRITE_TIMEOUT      15h
+#define SD_CARD_ERROR_SCK_RATE           16h
 
-            ldi   clkfreq.1             ; get address of bios variable
-            phi   re
-            ldi   clkfreq.0
-            plo   re
+#define SD_CARD_TYPE_SD1                 1
+#define SD_CARD_TYPE_SD2                 2
+#define SD_CARD_TYPE_SDHC                3
 
-            ldi   k_clkfreq.1           ; get address of kernel variable
-            phi   rf
-            ldi   k_clkfreq.0
+#define CMD0                             00h
+#define CMD8                             08h
+#define CMD9                             09h
+#define CMD10                            0ah
+#define CMD13                            0dh
+#define CMD17                            11h
+#define CMD24                            18h
+#define CMD25                            19h
+#define CMD32                            20h
+#define CMD33                            21h
+#define CMD38                            26h
+#define CMD55                            37h
+#define CMD58                            3ah
+#define ACMD23                           17h
+#define ACMD41                           29h
+
+#define R1_READY_STATE                   00h
+#define R1_IDLE_STATE                    01h
+#define R1_ILLEGAL_COMMAND               04h
+#define DATA_START_BLOCK                 0feh
+#define STOP_TRAN_TOKEN                  0fdh
+#define WRITE_MULTIPLE_TOKEN             0fch
+#define DATA_RES_MASK                    1fh
+#define DATA_RES_ACCEPTED                05h
+
+#define CS_LOW                           0ah
+#define CS_HIGH                          02h
+
+iderst:
+sdinit:     ldi   0
             plo   rf
 
-            lda   re                    ; update kernel with clock freq
-            str   rf
-            inc   rf
-            lda   re
-            str   rf
+          #if SPI_GROUP
+            sex   r3
+            out   EXP_PORT
+            db    SPI_GROUP
+            sex   r2
+          #endif
 
-            br    retvar                ; return freemem in rf
+            ldi   CS_HIGH               ; must supply min of 74 clock cycles
+            str   r2                    ; with !cs line high
+            out   SPI_CTL
+            dec   r2
 
+            ldi   10                    ; send 10 bytes to generate 80
+            plo   rc                    ; clock cycles.
+
+sd_clock:   ldi   $ff
+            str   r2
+            out   SPI_DATA
+            dec   r2
+
+            dec   rc
+            glo   rc
+            bnz   sd_clock
+
+            mov   r9, 1024
+
+sd_idle:    ldi   CMD0
+            plo   ra
+            ldi   0
+            phi   r8
+            plo   r8
+            phi   r7
+            plo   r7
+            sep   scall
+            dw    card_cmd              ; send cmd0, arg = 0
+            xri   R1_IDLE_STATE
+            bz    sd_ver
+
+            dec   r9
+            brnz  r9, sd_idle
+
+            br    sd_init_ex
+
+sd_ver:     ldi   CMD8
+            plo   ra
+            ldi   0
+            phi   r8
+            plo   r8
+            ldi   $01
+            phi   r7
+            ldi   $aa
+            plo   r7
+            sep   scall
+            dw    card_cmd
+            ani   R1_ILLEGAL_COMMAND
+            bz    sd_sd2
+
+            ldi   SD_CARD_TYPE_SD1
+            plo   rf
+            br    sd_do_init
+
+sd_sd2:     ldi   $ff
+            stxd
+            stxd
+            stxd
+            stxd
+            irx
+            out   SPI_DATA
+            out   SPI_DATA
+            out   SPI_DATA
+            out   SPI_DATA
+            dec   r2
+            inp   SPI_DATA
+            xri   $aa
+            bz    sd_sd2_typ
+
+            br    sd_init_ex
+
+sd_sd2_typ: ldi   SD_CARD_TYPE_SD2
+            plo   rf
+
+sd_do_init: mov   rc, 512
+
+do_acmd41:  ldi   ACMD41
+            plo   ra
+            ldi   0
+            plo   r8
+            phi   r7
+            plo   r7
+
+            glo   rf
+            xri   SD_CARD_TYPE_SD2
+            bz    init_sd2
+
+            ldi   0
+            phi   r8
+            sep   scall
+            dw    card_acmd
+            br    chk_cmd41
+
+init_sd2:   ldi   $40
+            phi   r8
+            sep   scall
+            dw    card_acmd
+
+chk_cmd41:  xri   R1_READY_STATE
+            bz    chk_sdhc1
+
+            dec   rc
+            brnz  rc, do_acmd41
+
+chk_sdhc1:  glo   rf
+            xri   SD_CARD_TYPE_SD2
+            bnz   sd_init_ex
+
+            ldi   CMD58
+            plo   ra
+            ldi   0
+            phi   r8
+            plo   r8
+            phi   r7
+            plo   r7
+            sep   scall
+            dw    card_cmd
+            bz    chk_sdhc2
+
+            br    sd_init_ex
+
+chk_sdhc2:  ldi   $ff
+            stxd
+            stxd
+            stxd
+            stxd
+            irx
+            out   SPI_DATA
+            dec   r2
+            inp   SPI_DATA
+            ani   $c0
+            xri   $c0
+            bnz   not_sdhc
+
+            ldi   SD_CARD_TYPE_SDHC
+            plo   rf
+
+not_sdhc:   irx
+            out   SPI_DATA
+            out   SPI_DATA
+            out   SPI_DATA
+            dec   r2
+
+sd_init_ex: sex   r3
+
+            out   SPI_CTL
+            db    CS_HIGH
+
+            out   SPI_DATA
+            db    $ff
+
+          #if SPI_GROUP
+            out   EXP_PORT
+            db    NO_GROUP
+          #endif
+
+            sex   r2
+
+            glo   rf
+            sep   sret
+
+error:      smi   0
+            sep   sret                  ; return to caller
+
+boot:       ldi   stack.1               ; setup stack for mark opcode
+            phi   r2
+            ldi   stack.0
+            plo   r2
+
+            ldi   ideboot.1             ; setup stack for mark opcode
+            phi   r6
+            ldi   ideboot.0
+            plo   r6
+
+            lbr   initcall              ; jump to initialization
+
+ideboot:    sep   scall                 ; initialize ide drive
+            dw    iderst
+
+            ldi   bootpg.1              ; load boot sector to $0100
+            phi   rf
+            ldi   bootpg.0
+            plo   rf
+
+            plo   r7                    ; set lba sector number to 0
+            phi   r7
+            plo   r8
+            phi   r8
+
+            sep   scall                 ; read boot sector
+            dw    ideread
+
+            lbr   bootpg+6              ; jump to entry point
+
+#endif
 
             ; Return a bitmap of devices present in the system. This now
             ; gives devices actually present, rather than just what has
@@ -1620,7 +1904,6 @@ retvar:     lda   re                    ; return variable value in rf
             phi   re
 
             sep   sret                  ; return to caller
-
 
 
           #if $ > 0fb00h
@@ -1658,7 +1941,7 @@ setbd:      ; a generic 1854 implementation.
 
             sex   r3
             out   UART_STATUS
-            db    19h                 ; 8 data bits, 1 stop bit, no parity
+            db    19h                   ; 8 data bits, 1 stop bit, no parity
 
           #if UART_GROUP
             out   EXP_PORT              ; make sure default expander group
@@ -1672,6 +1955,8 @@ setbd:      ; a generic 1854 implementation.
 usebbang:   lbr   btimalc
 
 
+#ifndef FAST_UART
+
 ; READ54 inputs character from the 1854 UART by jumping to UREAD54 if baud
 ; rate in RE.1 is set to zero, and from the bit-banged UART otherwise.
 
@@ -1679,6 +1964,7 @@ read:       ghi   re
             shr
             bnz   bread
             br    uread
+
 
 ; Output character through the 1854 UART if baud rate in RE.1 is zero by
 ; jumping to UTYPE54, or through bit-banged port otherwise.
@@ -1688,6 +1974,7 @@ type:       ghi   re
             bnz   btype
             br    utype
 
+#endif
 
 ; UREAD54 inputs character from the 1854 UART and echos character to output
 ; if RE.1 bit zero is set by falling through to UTYPE54 after input.
@@ -1768,6 +2055,8 @@ utest:      ; the 1854 UART, and DF=0 otherwise.
 
 ; End of 1854 UART send and receive code.
 
+
+#ifndef FAST_UART
 
             ; The recvwait call receives a character through the serial port
             ; waiting indefinitely. This is the core of the normal read call
@@ -1935,9 +2224,7 @@ btyretn:    inc   r2
             ldn   r2
             sep   sret
 
-
-
-
+#endif
 
 btest:      adi   0                   ; if no break, return df clear
             BRMK  nobreak
@@ -1996,28 +2283,161 @@ usetbd:     ani   7                     ; mask baud rate bits,
             shl
             sep   sret
 
+#ifdef MICRO_SD
+
+wait_idle:  lda   r6
+            phi   rc
+            lda   r6
+            plo   rc
+
+sd_wait:    ldi   $ff
+            str   r2
+            out   SPI_DATA
+            dec   r2
+            inp   SPI_DATA
+            xri   $ff
+            bz    sd_ready
+
+            ldi   83
+            plo   rd
+sd_delay:   dec   rd
+            glo   rd
+            bnz   sd_delay
+
+            dec   rc
+            brnz  rc, sd_wait
+
+            ldi   0
+            lskp
+sd_ready:   ldi   1
+
+            sep   sret
+
+card_cmd:   ldi   CS_LOW
+            str   r2
+            out   SPI_CTL
+            dec   r2
+
+            call  wait_idle
+            dw    300
+
+            glo   ra
+            xri   CMD0
+            bnz   sd_cmd8
+
+            ldi   $95
+            br    sd_crc
+
+sd_cmd8:    glo   ra
+            xri   CMD8
+            bnz   sd_other
+
+            ldi   $87
+            br    sd_crc
+
+sd_other:   ldi   $ff
+
+sd_crc:     stxd
+
+            glo   r7
+            stxd
+            ghi   r7
+            stxd
+            glo   r8
+            stxd
+            ghi   r8
+            stxd
+
+            glo   ra
+            ori   $40
+            stxd
+
+            irx
+            out   SPI_DATA
+            out   SPI_DATA
+            out   SPI_DATA
+            out   SPI_DATA
+            out   SPI_DATA
+            out   SPI_DATA
+            dec   r2
+
+            mov   rc, 512
+
+sd_status:  ldi   $ff
+            str   r2
+            out   SPI_DATA
+            dec   r2
+            inp   SPI_DATA
+            phi   ra
+            ani   $80
+            bz    sd_cmd_ret
+
+            dec   rc
+            brnz  rc, sd_status
+
+sd_cmd_ret: ghi   ra
+            sep   sret
+
+
+card_acmd:  glo   ra
+            stxd
+            ghi   r8
+            stxd
+            glo   r8
+            stxd
+            ghi   r7
+            stxd
+            glo   r7
+            stxd
+
+            ldi   CMD55
+            plo   ra
+            ldi   0
+            phi   r8
+            plo   r8
+            phi   r7
+            plo   r7
+            sep   scall
+            dw    card_cmd
+
+            irx
+            lda   r2
+            plo   r7
+            lda   r2
+            phi   r7
+            lda   r2
+            plo   r8
+            lda   r2
+            phi   r8
+            ldn   r2
+            plo   ra
+            call  card_cmd
+
+            sep   sret
+
+#endif
 
           #if $ > 0fc00h
             #error Page FB00 overflow
           #endif
 
 
-            org     0fc00h
+            org   0fc00h
 
-initcall:   ldi     call.1             ; address of scall
-            phi     r4
-            ldi     call.0
-            plo     r4
+initcall:   ldi   call.1                ; address of scall
+            phi   r4
+            ldi   call.0
+            plo   r4
 
-            ldi     ret.1              ; address of sret
-            phi     r5
-            ldi     ret.0
-            plo     r5
+            ldi   ret.1                 ; address of sret
+            phi   r5
+            ldi   ret.0
+            plo   r5
 
-            dec     r2                 ; sret needs to pop r6
-            dec     r2
+            dec   r2                    ; sret needs to pop r6
+            dec   r2
 
-            sep     r5                 ; jump to sret
+            sep   r5                    ; jump to sret
 
 
             ; Compare two strings pointed to by RF and RF and return a byte
@@ -2325,9 +2745,400 @@ back:       dec   rf
            
 
           #if $ > 0fd00h
+            #error Page FC00 overflow
+          #endif
+
+            org   0fd00h
+
+#ifdef FAST_UART
+
+            ; The bread call receives a character through the serial port
+            ; waiting indefinitely. This is the core of the normal read call
+            ; and is only callable via SEP.
+
+bread:      BRMK  bread                 ; wait for start bit
+            nop
+            nop
+            nop
+            nop
+            nop
+            sex   r2
+si_b0:      BRMK  si_b0_1
+            ani   $7f
+            lbr   si_b1
+si_b0_1:    ori   080h
+            lbr   si_b1
+si_b1:      shr
+            sex   r2
+            sex   r2
+            BRMK  si_b1_1
+            ani   07fh
+            lbr   si_b2
+si_b1_1:    ori   080h
+            lbr   si_b2
+si_b2:      shr
+            sex   r2
+            sex   r2
+            BRMK  si_b2_1
+            ani   07fh
+            lbr   si_b3
+si_b2_1:    ori   080h
+            lbr   si_b3
+si_b3:      shr
+            sex   r2
+            sex   r2
+            BRMK  si_b3_1
+            ani   07fh
+            lbr   si_b4
+si_b3_1:    ori   080h
+            lbr   si_b4
+si_b4:      shr
+            sex   r2
+            sex   r2
+            BRMK  si_b4_1
+            ani   07fh
+            lbr   si_b5
+si_b4_1:    ori   080h
+            lbr   si_b5
+si_b5:      shr
+            sex   r2
+            sex   r2
+            BRMK  si_b5_1
+            ani   07fh
+            lbr   si_b6
+si_b5_1:    ori   080h
+            lbr   si_b6
+si_b6:      shr
+            sex   r2
+            sex   r2
+            BRMK  si_b6_1
+            ani   07fh
+            lbr   si_b7
+si_b6_1:    ori   080h
+            lbr   si_b7
+si_b7:      shr
+            sex   r2
+            sex   r2
+            BRMK  si_b7_1
+            ani   07fh
+            lbr   si_stop
+si_b7_1:    ori   080h
+            lbr   si_stop
+si_stop:    nop
+            nop
+si_wait:    BRSP  si_wait
+
+            plo   re
+            ghi   re                    ; if echo flag clear, just return it
+            shr
+            bdf   btype
+
+            glo   re
+            sep   sret
+
+
+            ; For the 1802 MAX, bit-bang serial output is fixed at 38400 baud.
+            ; No delay timer value is required. This is inlined into
+            ; nbread but can also be called separately using SEP.
+
+btype:      glo   re
+            SESP                        ; start bit
+            sex   r2
+            sex   r2
+so_b0:      shrc
+            sex   r2
+            sex   r2
+            bdf   so_b0_1
+            SESP
+            lbr   so_b1
+so_b0_1:    SEMK
+            lbr   so_b1
+so_b1:      shrc
+            sex   r2
+            sex   r2
+            bdf   so_b1_1
+            SESP
+            lbr   so_b2
+so_b1_1:    SEMK
+            lbr   so_b2
+so_b2:      shrc
+            sex   r2
+            sex   r2
+            bdf   so_b2_1
+            SESP
+            lbr   so_b3
+so_b2_1:    SEMK
+            lbr   so_b3
+so_b3:      shrc
+            sex   r2
+            sex   r2
+            bdf   so_b3_1
+            SESP
+            lbr   so_b4
+so_b3_1:    SEMK
+            lbr   so_b4
+so_b4:      shrc
+            sex   r2
+            sex   r2
+            bdf   so_b4_1
+            SESP
+            lbr   so_b5
+so_b4_1:    SEMK
+            lbr   so_b5
+so_b5:      shrc
+            sex   r2
+            sex   r2
+            bdf   so_b5_1
+            SESP
+            lbr   so_b6
+so_b5_1:    SEMK
+            lbr   so_b6
+so_b6:      shrc
+            sex   r2
+            sex   r2
+            bdf   so_b6_1
+            SESP
+            lbr   so_b7
+so_b6_1:    SEMK
+            lbr   so_b7
+so_b7:      shrc
+            sex   r2
+            sex   r2
+            bdf   so_b7_1
+            SESP
+            lbr   so_stop
+so_b7_1:    SEMK
+            lbr   so_stop
+so_stop:    nop
+            nop
+            sex   r2
+            SEMK                        ; stop bit
+            shrc                        ; restore D
+
+            sep    sret
+
+#endif
+
+          #if $ > 0fe00h
             #error Page FD00 overflow
           #endif
 
+#ifdef MICRO_SD
+
+            org   0fe00h
+
+ideread:
+sdread:     ghi   ra
+            stxd
+            glo   ra
+            stxd
+            ghi   rc
+            stxd
+            glo   rc
+            stxd
+            glo   rd
+            stxd
+
+            ghi   rf
+            phi   r0
+            glo   rf
+            plo   r0
+
+          #if SPI_GROUP
+            sex   r3
+            out   EXP_PORT
+            db    SPI_GROUP
+            sex   r2
+          #endif
+
+            ldi   CMD17
+            plo   ra
+            sep   scall
+            dw    card_cmd
+            bz    sd_read_ok
+
+            ldi   $ff
+            str   r2
+            out   SPI_DATA
+            dec   r2
+
+            br    sd_error
+
+sd_read_ok: mov   rc, 512
+
+sd_start:   ldi   $ff
+            str   r2
+            out   SPI_DATA
+            dec   r2
+            inp   SPI_DATA
+            phi   ra
+            xri   $ff
+            bnz   sd_token
+
+            dec   rc
+            brnz  rc, sd_start
+
+            br    sd_error
+
+sd_token:   ghi   ra
+            xri   DATA_START_BLOCK
+            bz    sd_dma_rd
+
+            br    sd_error
+
+sd_dma_rd:  sex   r3
+            out   SPI_DATA
+            db    $ff
+
+            ldi   4
+            plo   rd
+
+sd_rd_blk:  out   SPI_CTL
+            db    $1a
+            out   SPI_CTL
+            db    $80
+            out   SPI_CTL
+            db    $3a
+
+            dec   rd
+            glo   rd
+            bnz   sd_rd_blk
+
+            out   SPI_CTL
+            db    $1a
+
+            out   SPI_DATA
+            db    $ff
+
+sd_exit:    clc
+            lskp
+sd_error:   stc
+
+            sex   r3
+
+            out   SPI_CTL
+            db    CS_HIGH
+
+            out   SPI_DATA
+            db    $ff
+
+          #if SPI_GROUP
+            out   EXP_PORT
+            db    NO_GROUP
+          #endif
+
+            sex   r2
+
+            irx
+            ldxa
+            plo   rd
+            ldxa
+            plo   rc
+            ldxa
+            phi   rc
+            ldxa
+            plo   ra
+            ldn   r2
+            phi   ra
+
+            sep   sret
+
+idewrt:
+sdwrite:    ghi     ra
+            stxd
+            glo     ra
+            stxd
+            ghi     rc
+            stxd
+            glo     rc
+            stxd
+            glo     rd
+            stxd
+
+            ghi     rf
+            phi     r0
+            glo     rf
+            plo     r0
+
+          #if SPI_GROUP
+            sex   r3
+            out   EXP_PORT
+            db    SPI_GROUP
+            sex   r2
+          #endif
+
+            ldi     CMD24
+            plo     ra
+            sep     scall
+            dw      card_cmd
+            bnz     sd_error
+
+            sex     r3
+
+            out     SPI_DATA
+            db      DATA_START_BLOCK
+
+            ldi     4
+            plo     rd
+
+sd_wr_blk:  out     SPI_CTL
+            db      $1a
+            out     SPI_CTL
+            db      $80
+            out     SPI_CTL
+            db      $5a
+
+            dec     rd
+            glo     rd
+            bnz     sd_wr_blk
+
+            out     SPI_CTL
+            db      $0a
+
+            sex     r2
+
+            ldi     $ff
+            str     r2
+            out     SPI_DATA
+            dec     r2
+            out     SPI_DATA
+            dec     r2
+
+            out     SPI_DATA
+            dec     r2
+            inp     SPI_DATA
+            ani     DATA_RES_MASK
+            xri     DATA_RES_ACCEPTED
+            bnz     sd_error
+
+            call    wait_idle
+            dw      SD_WRITE_TIMEOUT
+            bz      sd_error
+
+            ldi     CMD13
+            plo     ra
+            ldi     0
+            phi     r8
+            plo     r8
+            phi     r7
+            plo     r7
+            call    card_cmd
+            bnz     sd_error
+
+            ldi     $ff
+            str     r2
+            out     SPI_DATA
+            dec     r2
+            inp     SPI_DATA
+            bnz     sd_error
+
+            br      sd_exit
+
+#endif
+
+          #if $ > 0ff00h
+            #error Page FE00 overflow
+          #endif
 
             org   0ff00h
 
@@ -2431,6 +3242,43 @@ timekeep:   ghi   re                  ; Get final result and shift left one
             sep   sret                ;  return to caller
 
 
+            ; Return the address of the last byte of RAM. This returns the
+            ; RAM size that was discovered at boot rather than discovering
+            ; each time or having a built-in value. As a side effect, this
+            ; also updates the kernel variable containing the processor clock
+            ; frequency since there is no other way for that to happen
+            ; currently and this is a way to make it happen at start-up.
+
+freemem:    ghi   re                    ; we only need to half-save for temp
+            stxd
+
+            ldi   clkfreq.1             ; get address of bios variable
+            phi   re
+            ldi   clkfreq.0
+            plo   re
+
+            ldi   k_clkfreq.1           ; get address of kernel variable
+            phi   rf
+            ldi   k_clkfreq.0
+            plo   rf
+
+            lda   re                    ; update kernel with clock freq
+            str   rf
+            inc   rf
+            lda   re
+            str   rf
+
+            lda   re                    ; return freemem in rf
+            phi   rf
+            lda   re
+            plo   rf
+
+            inc   r2                    ; restore re.1 from temp use
+            ldn   r2
+            phi   re
+
+            sep   sret                  ; return to caller
+
 
             ; The entry points call at 0FFE0h and ret at 0FFF1h are indicated
             ; in Mike Riley's bios.inc as being deprecated, but the Elf/OS
@@ -2447,7 +3295,7 @@ timekeep:   ghi   re                  ; Get final result and shift left one
             ; using the 1804/5/6 extended instruction set. For now this is
             ; considered as an experimental change while impact is assessed.
 
-            org     0ffd8h
+            org   0ffd8h
 
 callbr:     glo   r3
             plo   r6
@@ -2460,7 +3308,7 @@ callbr:     glo   r3
             glo   re
             sep   r3                    ; jump to called routine
 
-            org 0ffe0h
+            org   0ffe0h
 
             ; Entry point for CALL here.
 
@@ -2486,7 +3334,7 @@ retbr:      irx                         ; restore next-prior return address
             glo   re                    ; restore d and jump to return
             sep   r3                    ;  address taken from r6
 
-            org 0fff1h
+            org   0fff1h
 
             ; Entry point for RET here.
 
@@ -2503,6 +3351,6 @@ ret:        plo   re                    ; save d and set x to 2
 
             org   0fff9h
 
-version:    db    2,1,0
+version:    db    3,1,0
 chsum:      db    0,0,0,0
 

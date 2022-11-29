@@ -17,6 +17,11 @@ rc1802: mbios.asm
 	asm02 -L -b -DRC1802 mbios.tmp
 	@rm mbios.build mbios.tmp
 
+max: mbios.asm
+	@sed 's/^  *#/#/' mbios.asm > mbios.tmp
+	asm02 -L -b -D1802MAX mbios.tmp
+	@rm mbios.build mbios.tmp
+
 test: mbios.asm
 	@sed 's/^  *#/#/' mbios.asm > mbios.tmp
 	asm02 -L -b -DTEST mbios.tmp

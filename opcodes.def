@@ -1,0 +1,8 @@
+.op "MOV","NR","9$2 B$1 8$2 A$1"
+.op "MOV","NW","F8 H2 B$1 F8 L2 A$1"
+.op "BRNZ","RW","8$1 3A L2 9$1 3A L2"
+.op "LBRNZ","RW","8$1 CA H2 L2 9$1 CA H2 L2"
+.op "CALL","W","D4 H1 L1"
+.op "RTN","","D5"
+.op "CLC","","fc 00"
+.op "STC","","ff 00"

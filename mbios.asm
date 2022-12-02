@@ -2944,6 +2944,10 @@ sdread:     ghi   ra
             glo   rf
             plo   r0
 
+            ghi   r8
+            ani   $0f
+            phi   r8
+
           #if SPI_GROUP
             sex   r3
             out   EXP_PORT
@@ -3027,6 +3031,11 @@ sd_error:   stc
             db    NO_GROUP
           #endif
 
+            ghi   r0
+            phi   rf
+            glo   r0
+            plo   rf
+
             sex   r2
 
             irx
@@ -3044,22 +3053,26 @@ sd_error:   stc
             sep   sret
 
 idewrt:
-sdwrite:    ghi     ra
+sdwrite:    ghi   ra
             stxd
-            glo     ra
+            glo   ra
             stxd
-            ghi     rc
+            ghi   rc
             stxd
-            glo     rc
+            glo   rc
             stxd
-            glo     rd
+            glo   rd
             stxd
 
-            ghi     rf
-            phi     r0
-            glo     rf
-            plo     r0
+            ghi   rf
+            phi   r0
+            glo   rf
+            plo   r0
 
+            ghi   r8
+            ani   $0f
+            phi   r8
+  
           #if SPI_GROUP
             sex   r3
             out   EXP_PORT

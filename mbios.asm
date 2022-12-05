@@ -40,6 +40,7 @@
   #define UART_DATA    6                ; uart data port
   #define UART_STATUS  7                ; uart status/command port
   #define FAST_UART
+  #define HI_BAUD
   #define SET_BAUD     38400            ; bit-bang serial fixed baud rate
   #define FREQ_KHZ     4000             ; default processor clock frequency
 #endif
@@ -2240,10 +2241,19 @@ nobreak:    sep   sret                ; return result
 ; 8250 UART registers, and we want to be compatible with that.
 
 usetbd:     ani   7                     ; mask baud rate bits,
+#ifdef HI_BAUD
+            xri   7
+            bz    baud56
+            xri   7
+#endif
             lsz                         ;  if not zero,
             adi   1                     ;  add one
 
             shl                         ; shift left,
+#ifdef HI_BAUD
+            lskp
+baud56:     ldi   0fh
+#endif
             ori   32                    ;  set no jumper bit
 
           #if UART_GROUP

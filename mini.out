@@ -1,0 +1,595 @@
+Asm/02 v1.2
+by Michael H. Riley
+#include opcodes.def
+#include sysconfig.inc                  ; Hardware and Build Target Definitions
+#define NO_GROUP       0                ; hardware defined - do not change
+#ifdef 1802MINI
+#define BRMK         bn2              ; branch on serial mark
+nests[0] = Y
+#define BRSP         b2               ; branch on serial space
+nests[0] = Y
+#define SEMK         seq              ; set serial mark
+nests[0] = Y
+#define SESP         req              ; set serial space
+nests[0] = Y
+#define EXP_PORT     1                ; group i/o expander port
+nests[0] = Y
+#define EXP_MEMORY                    ; enable expansion memory
+nests[0] = Y
+#define IDE_GROUP    0                ; ide interface group
+nests[0] = Y
+#define IDE_SELECT   2                ; ide interface address port
+nests[0] = Y
+#define IDE_DATA     3                ; ide interface data port
+nests[0] = Y
+#define RTC_GROUP    0                ; real time clock group
+nests[0] = Y
+#define RTC_PORT     5                ; real time clock port
+nests[0] = Y
+#define UART_GROUP   0                ; uart port group
+nests[0] = Y
+#define UART_DATA    6                ; uart data port
+nests[0] = Y
+#define UART_STATUS  7                ; uart status/command port
+nests[0] = Y
+#define SET_BAUD     19200            ; bit-bang serial fixed baud rate
+nests[0] = Y
+#define FREQ_KHZ     4000             ; default processor clock frequency
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef SUPERELF
+#define BRMK         bn2              ; branch on serial mark
+nests[0] = Y
+#define BRSP         b2               ; branch on serial space
+nests[0] = Y
+#define SEMK         seq              ; set serial mark
+nests[0] = Y
+#define SESP         req              ; set serial space
+nests[0] = Y
+#define EXP_PORT     5                ; group i/o expander port
+nests[0] = Y
+#define EXP_MEMORY                    ; enable expansion memory
+nests[0] = Y
+#define IDE_GROUP    0                ; ide interface group
+nests[0] = Y
+#define IDE_SELECT   2                ; ide interface address port
+nests[0] = Y
+#define IDE_DATA     3                ; ide interface data port
+nests[0] = Y
+#define UART_GROUP   0                ; uart port group
+nests[0] = Y
+#define UART_DATA    6                ; uart data port
+nests[0] = Y
+#define UART_STATUS  7                ; uart status/command port
+nests[0] = Y
+#define RTC_GROUP    1                ; real time clock group
+nests[0] = Y
+#define RTC_PORT     3                ; real time clock port
+nests[0] = Y
+#define SET_BAUD     9600             ; bit-bang serial fixed baud rate
+nests[0] = Y
+#define FREQ_KHZ     1790             ; default processor clock frequency
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef RC1802
+#define BRMK         bn3              ; branch on serial mark
+nests[0] = Y
+#define BRSP         b3               ; branch on serial space
+nests[0] = Y
+#define SEMK         seq              ; set serial mark
+nests[0] = Y
+#define SESP         req              ; set serial space
+nests[0] = Y
+#define EXP_PORT     1                ; group i/o expander port
+nests[0] = Y
+#define IDE_GROUP    0                ; ide interface group
+nests[0] = Y
+#define IDE_SELECT   2                ; ide interface address port
+nests[0] = Y
+#define IDE_DATA     3                ; ide interface data port
+nests[0] = Y
+#define UART_GROUP   1                ; uart port group
+nests[0] = Y
+#define UART_DATA    2                ; uart data port
+nests[0] = Y
+#define UART_STATUS  3                ; uart status/command port
+nests[0] = Y
+#define RTC_GROUP    2                ; real time clock group
+nests[0] = Y
+#define RTC_PORT     3                ; real time clock port
+nests[0] = Y
+#define SET_BAUD     9600             ; bit-bang serial fixed baud rate
+nests[0] = Y
+#define FREQ_KHZ     2000             ; default processor clock frequency
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef TEST
+#define BRMK         bn2              ; branch on serial mark
+nests[0] = Y
+#define BRSP         b2               ; branch on serial space
+nests[0] = Y
+#define SEMK         seq              ; set serial mark
+nests[0] = Y
+#define SESP         req              ; set serial space
+nests[0] = Y
+#define EXP_PORT     5                ; group i/o expander port
+nests[0] = Y
+#define IDE_GROUP    1                ; ide interface group
+nests[0] = Y
+#define IDE_SELECT   2                ; ide interface address port
+nests[0] = Y
+#define IDE_DATA     3                ; ide interface data port
+nests[0] = Y
+#define UART_GROUP   4                ; uart port group
+nests[0] = Y
+#define UART_DATA    6                ; uart data port
+nests[0] = Y
+#define UART_STATUS  7                ; uart status/command port
+nests[0] = Y
+#define RTC_GROUP    2                ; real time clock group
+nests[0] = Y
+#define RTC_PORT     3                ; real time clock port
+nests[0] = Y
+#define FREQ_KHZ     4000             ; default processor clock frequency
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef 1802MAX
+#define BRMK         bn2              ; branch on serial mark
+nests[0] = Y
+#define BRSP         b2               ; branch on serial space
+nests[0] = Y
+#define SEMK         req              ; set serial mark
+nests[0] = Y
+#define SESP         seq              ; set serial space
+nests[0] = Y
+#define EXP_PORT     5                ; group i/o expander port
+nests[0] = Y
+#define EXP_MEMORY                    ; enable expansion memory
+nests[0] = Y
+#define MICRO_SD
+nests[0] = Y
+#define SPI_GROUP    0                ; spi interface group
+nests[0] = Y
+#define SPI_CTL      2                ; spi interface control port
+nests[0] = Y
+#define SPI_DATA     3                ; spi interface data port
+nests[0] = Y
+#define RTC_GROUP    0                ; real time clock group
+nests[0] = Y
+#define RTC_PORT     1                ; real time clock port
+nests[0] = Y
+#define UART_GROUP   0                ; uart port group
+nests[0] = Y
+#define UART_DATA    6                ; uart data port
+nests[0] = Y
+#define UART_STATUS  7                ; uart status/command port
+nests[0] = Y
+#define FAST_UART
+nests[0] = Y
+#define HI_BAUD
+nests[0] = Y
+#define SET_BAUD     38400            ; bit-bang serial fixed baud rate
+nests[0] = Y
+#define FREQ_KHZ     4000             ; default processor clock frequency
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef ELFII
+#define BRMK         bn2              ; branch on serial mark
+nests[0] = Y
+#define BRSP         b2               ; branch on serial space
+nests[0] = Y
+#define SEMK         req              ; set serial mark
+nests[0] = Y
+#define SESP         seq              ; set serial space
+nests[0] = Y
+#define EXP_PORT     1                ; group i/o expander port
+nests[0] = Y
+#define EXP_MEMORY                    ; enable expansion memory
+nests[0] = Y
+#define MICRO_SD
+nests[0] = Y
+#define SPI_GROUP    0                ; spi interface group
+nests[0] = Y
+#define SPI_CTL      2                ; spi interface control port
+nests[0] = Y
+#define SPI_DATA     3                ; spi interface data port
+nests[0] = Y
+#define RTC_GROUP    0                ; real time clock group
+nests[0] = Y
+#define RTC_PORT     5                ; real time clock port
+nests[0] = Y
+#define UART_GROUP   0                ; uart port group
+nests[0] = Y
+#define UART_DATA    6                ; uart data port
+nests[0] = Y
+#define UART_STATUS  7                ; uart status/command port
+nests[0] = Y
+#define FAST_UART
+nests[0] = Y
+#define HI_BAUD
+nests[0] = Y
+#define SET_BAUD     19200            ; bit-bang serial fixed baud rate
+nests[0] = Y
+#define FREQ_KHZ     1790             ; default processor clock frequency
+nests[0] = Y
+#endif
+nests[0] = Y
+#define IDE_SETTLE     500              ; milliseconds delay before booting
+#define UART_DETECT                     ; use uart if no bit-bang cable
+#define INIT_CON                        ; initialize console before booting
+#if UART_GROUP
+#endif
+nests[0] = Y
+#if RTC_GROUP != UART_GROUP
+#endif
+nests[0] = Y
+#ifdef EXP_MEMORY
+#endif
+nests[0] = Y
+#if RTC_GROUP
+#endif
+nests[0] = Y
+#if $ > 0f700h
+#error Page F600 overflow
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef INIT_CON
+#endif
+nests[0] = Y
+#ifdef IDE_SETTLE
+#endif
+nests[0] = Y
+#if $ > 0f800h
+#error Page F700 overflow
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef FAST_UART
+#endif
+nests[0] = Y
+#if $ > 0f900h
+#error Page F800 overflow
+nests[0] = Y
+#endif
+nests[0] = Y
+#if RTC_GROUP
+#endif
+nests[0] = Y
+#if RTC_GROUP
+#endif
+nests[0] = Y
+#if RTC_GROUP
+#endif
+nests[0] = Y
+#ifdef FAST_UART
+#endif
+nests[0] = Y
+#if $ > 0fa00h
+#error Page F900 overflow
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifndef MICRO_SD
+#define IDE_A_COUNT 80h                 ; dma sector count
+nests[0] = Y
+#define IDE_A_DMOUT 40h                 ; dma out enable
+nests[0] = Y
+#define IDE_A_DMAIN 20h                 ; dma in enable
+nests[0] = Y
+#define IDE_A_STOP  00h                 ; dma in enable
+nests[0] = Y
+#define IDE_R_ERROR 01h
+nests[0] = Y
+#define IDE_R_FEAT  01h
+nests[0] = Y
+#define IDE_R_COUNT 02h
+nests[0] = Y
+#define IDE_R_SECT  03h
+nests[0] = Y
+#define IDE_R_CYLLO 04h
+nests[0] = Y
+#define IDE_R_CYLHI 05h
+nests[0] = Y
+#define IDE_R_HEAD  06h
+nests[0] = Y
+#define IDE_R_STAT  07h
+nests[0] = Y
+#define IDE_R_CMND  07h
+nests[0] = Y
+#define IDE_S_BUSY  80h                 ; busy
+nests[0] = Y
+#define IDE_S_RDY   40h                 ; ready
+nests[0] = Y
+#define IDE_S_DRQ   08h                 ; data request
+nests[0] = Y
+#define IDE_S_ERR   01h                 ; error
+nests[0] = Y
+#define IDE_H_CHS   0a0h
+nests[0] = Y
+#define IDE_H_LBA   0e0h
+nests[0] = Y
+#define IDE_C_READ  20h                 ; read sector
+nests[0] = Y
+#define IDE_C_WRITE 30h                 ; write sector
+nests[0] = Y
+#define IDE_C_FEAT  0efh                ; set feature
+nests[0] = Y
+#define IDE_F_8BIT  01h                 ; 8-bit mode
+nests[0] = Y
+#if IDE_GROUP
+nests[0] = Y
+#endif
+nests[0] = Y
+nests[1] = Y
+#if IDE_GROUP
+nests[0] = Y
+#endif
+nests[0] = Y
+nests[1] = Y
+#if IDE_GROUP
+nests[0] = Y
+#endif
+nests[0] = Y
+nests[1] = Y
+#if IDE_GROUP
+nests[0] = Y
+#endif
+nests[0] = Y
+nests[1] = Y
+#else
+nests[0] = Y
+#define SD_INIT_TIMEOUT                 2000
+nests[0] = Y
+#define SD_ERASE_TIMEOUT                100000
+nests[0] = Y
+#define SD_READ_TIMEOUT                 300
+nests[0] = Y
+#define SD_WRITE_TIMEOUT                600
+nests[0] = Y
+#define SD_CARD_ERROR_CMD0               01h
+nests[0] = Y
+#define SD_CARD_ERROR_CMD8               02h
+nests[0] = Y
+#define SD_CARD_ERROR_CMD17              03h
+nests[0] = Y
+#define SD_CARD_ERROR_CMD24              04h
+nests[0] = Y
+#define SD_CARD_ERROR_CMD25              05h
+nests[0] = Y
+#define SD_CARD_ERROR_CMD58              06h
+nests[0] = Y
+#define SD_CARD_ERROR_ACMD23             07h
+nests[0] = Y
+#define SD_CARD_ERROR_ACMD41             08h
+nests[0] = Y
+#define SD_CARD_ERROR_BAD_CSD            09h
+nests[0] = Y
+#define SD_CARD_ERROR_ERASE              0ah
+nests[0] = Y
+#define SD_CARD_ERROR_ERASE_SINGLE_BLOCK 0bh
+nests[0] = Y
+#define SD_CARD_ERROR_ERASE_TIMEOUT      0ch
+nests[0] = Y
+#define SD_CARD_ERROR_READ               0dh
+nests[0] = Y
+#define SD_CARD_ERROR_READ_REG           0eh
+nests[0] = Y
+#define SD_CARD_ERROR_READ_TIMEOUT       0fh
+nests[0] = Y
+#define SD_CARD_ERROR_STOP_TRAN          10h
+nests[0] = Y
+#define SD_CARD_ERROR_WRITE              11h
+nests[0] = Y
+#define SD_CARD_ERROR_WRITE_BLOCK_ZERO   12h
+nests[0] = Y
+#define SD_CARD_ERROR_WRITE_MULTIPLE     13h
+nests[0] = Y
+#define SD_CARD_ERROR_WRITE_PROGRAMMING  14h
+nests[0] = Y
+#define SD_CARD_ERROR_WRITE_TIMEOUT      15h
+nests[0] = Y
+#define SD_CARD_ERROR_SCK_RATE           16h
+nests[0] = Y
+#define SD_CARD_TYPE_SD1                 1
+nests[0] = Y
+#define SD_CARD_TYPE_SD2                 2
+nests[0] = Y
+#define SD_CARD_TYPE_SDHC                3
+nests[0] = Y
+#define CMD0                             00h
+nests[0] = Y
+#define CMD8                             08h
+nests[0] = Y
+#define CMD9                             09h
+nests[0] = Y
+#define CMD10                            0ah
+nests[0] = Y
+#define CMD13                            0dh
+nests[0] = Y
+#define CMD17                            11h
+nests[0] = Y
+#define CMD24                            18h
+nests[0] = Y
+#define CMD25                            19h
+nests[0] = Y
+#define CMD32                            20h
+nests[0] = Y
+#define CMD33                            21h
+nests[0] = Y
+#define CMD38                            26h
+nests[0] = Y
+#define CMD55                            37h
+nests[0] = Y
+#define CMD58                            3ah
+nests[0] = Y
+#define ACMD23                           17h
+nests[0] = Y
+#define ACMD41                           29h
+nests[0] = Y
+#define R1_READY_STATE                   00h
+nests[0] = Y
+#define R1_IDLE_STATE                    01h
+nests[0] = Y
+#define R1_ILLEGAL_COMMAND               04h
+nests[0] = Y
+#define DATA_START_BLOCK                 0feh
+nests[0] = Y
+#define STOP_TRAN_TOKEN                  0fdh
+nests[0] = Y
+#define WRITE_MULTIPLE_TOKEN             0fch
+nests[0] = Y
+#define DATA_RES_MASK                    1fh
+nests[0] = Y
+#define DATA_RES_ACCEPTED                05h
+nests[0] = Y
+#define CS_LOW                           0ah
+nests[0] = Y
+#define CS_HIGH                          02h
+nests[0] = Y
+#if SPI_GROUP
+nests[0] = Y
+#endif
+nests[0] = Y
+nests[1] = N
+#if SPI_GROUP
+nests[0] = Y
+#endif
+nests[0] = Y
+nests[1] = N
+#endif
+nests[0] = Y
+#if $ > 0fb00h
+#error Page FA00 overflow
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef UART_DETECT
+#endif
+nests[0] = Y
+#if UART_GROUP
+#endif
+nests[0] = Y
+#if UART_GROUP
+#endif
+nests[0] = Y
+#ifndef FAST_UART
+#endif
+nests[0] = Y
+#if UART_GROUP
+#endif
+nests[0] = Y
+#if UART_GROUP
+#else
+nests[0] = Y
+#endif
+nests[0] = Y
+#if UART_GROUP
+#endif
+nests[0] = Y
+#if UART_GROUP
+#endif
+nests[0] = Y
+#if UART_GROUP
+#endif
+nests[0] = Y
+#ifndef FAST_UART
+#endif
+nests[0] = Y
+#ifdef HI_BAUD
+#endif
+nests[0] = Y
+#ifdef HI_BAUD
+#endif
+nests[0] = Y
+#if UART_GROUP
+#endif
+nests[0] = Y
+#if UART_GROUP
+#endif
+nests[0] = Y
+#ifdef MICRO_SD
+#endif
+nests[0] = Y
+#if $ > 0fc00h
+#error Page FB00 overflow
+nests[0] = Y
+#endif
+nests[0] = Y
+#if $ > 0fd00h
+#error Page FC00 overflow
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef FAST_UART
+#if FREQ_KHZ == 4000
+nests[0] = Y
+#include    fast_uart4000.asm
+nests[0] = Y
+nests[1] = N
+#else
+nests[0] = Y
+nests[1] = N
+#if FREQ_KHZ == 1790 || FREQ_KHZ == 3686
+nests[0] = Y
+nests[1] = N
+#include  fast_uart1790.asm
+nests[0] = Y
+nests[1] = N
+#else
+nests[0] = Y
+nests[1] = N
+#error    Fast UART not supported at this speed.
+nests[0] = Y
+nests[1] = N
+#endif
+nests[0] = Y
+nests[1] = N
+#endif
+nests[0] = Y
+#endif
+***Error: Unmatched #endif
+#if $ > 0fe00h
+#error Page FD00 overflow
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef MICRO_SD
+#if SPI_GROUP
+nests[0] = Y
+#endif
+nests[0] = Y
+nests[1] = N
+#if SPI_GROUP
+nests[0] = Y
+#endif
+nests[0] = Y
+nests[1] = N
+#if SPI_GROUP
+nests[0] = Y
+#endif
+nests[0] = Y
+nests[1] = N
+#endif
+nests[0] = Y
+#if $ > 0ff00h
+#error Page FE00 overflow
+nests[0] = Y
+#endif
+nests[0] = Y
+#ifdef SET_BAUD
+#else
+nests[0] = Y
+#endif
+nests[0] = Y
+Errors during pass 1, aborting pass 2
+
+Lines Assembled   : 4544
+Code Generated    : 0
+Errors            : 1
+

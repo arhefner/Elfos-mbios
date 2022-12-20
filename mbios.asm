@@ -14,111 +14,11 @@
 ;  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include opcodes.def
-
-            ; Hardware and Build Target Definitions
-
-#define NO_GROUP       0                ; hardware defined - do not change
+#include sysconfig.inc                  ; Hardware and Build Target Definitions
 
 #define IDE_SETTLE     500              ; milliseconds delay before booting
 #define UART_DETECT                     ; use uart if no bit-bang cable
 #define INIT_CON                        ; initialize console before booting
-
-#ifdef 1802MAX
-  #define BRMK         bn2              ; branch on serial mark
-  #define BRSP         b2               ; branch on serial space
-  #define SEMK         req              ; set serial mark
-  #define SESP         seq              ; set serial space
-  #define EXP_PORT     5                ; group i/o expander port
-  #define EXP_MEMORY                    ; enable expansion memory
-  #define MICRO_SD
-  #define SPI_GROUP    0                ; spi interface group
-  #define SPI_CTL      2                ; spi interface control port
-  #define SPI_DATA     3                ; spi interface data port
-  #define RTC_GROUP    0                ; real time clock group
-  #define RTC_PORT     1                ; real time clock port
-  #define UART_GROUP   0                ; uart port group
-  #define UART_DATA    6                ; uart data port
-  #define UART_STATUS  7                ; uart status/command port
-  #define FAST_UART
-  #define HI_BAUD
-  #define SET_BAUD     38400            ; bit-bang serial fixed baud rate
-  #define FREQ_KHZ     4000             ; default processor clock frequency
-#endif
-
-#ifdef 1802MINI
-  #define BRMK         bn2              ; branch on serial mark
-  #define BRSP         b2               ; branch on serial space
-  #define SEMK         seq              ; set serial mark
-  #define SESP         req              ; set serial space
-  #define EXP_PORT     1                ; group i/o expander port
-  #define EXP_MEMORY                    ; enable expansion memory
-  #define IDE_GROUP    0                ; ide interface group
-  #define IDE_SELECT   2                ; ide interface address port
-  #define IDE_DATA     3                ; ide interface data port
-  #define RTC_GROUP    0                ; real time clock group
-  #define RTC_PORT     5                ; real time clock port
-  #define UART_GROUP   0                ; uart port group
-  #define UART_DATA    6                ; uart data port
-  #define UART_STATUS  7                ; uart status/command port
-  #define SET_BAUD     19200            ; bit-bang serial fixed baud rate
-  #define FREQ_KHZ     4000             ; default processor clock frequency
-#endif
-
-#ifdef SUPERELF
-  #define BRMK         bn2              ; branch on serial mark
-  #define BRSP         b2               ; branch on serial space
-  #define SEMK         seq              ; set serial mark
-  #define SESP         req              ; set serial space
-  #define EXP_PORT     5                ; group i/o expander port
-  #define EXP_MEMORY                    ; enable expansion memory
-  #define IDE_GROUP    0                ; ide interface group
-  #define IDE_SELECT   2                ; ide interface address port
-  #define IDE_DATA     3                ; ide interface data port
-  #define UART_GROUP   0                ; uart port group
-  #define UART_DATA    6                ; uart data port
-  #define UART_STATUS  7                ; uart status/command port
-  #define RTC_GROUP    1                ; real time clock group
-  #define RTC_PORT     3                ; real time clock port
-  #define SET_BAUD     9600             ; bit-bang serial fixed baud rate
-  #define FREQ_KHZ     1790             ; default processor clock frequency
-#endif
-
-#ifdef RC1802
-  #define BRMK         bn3              ; branch on serial mark
-  #define BRSP         b3               ; branch on serial space
-  #define SEMK         seq              ; set serial mark
-  #define SESP         req              ; set serial space
-  #define EXP_PORT     1                ; group i/o expander port
-  #define IDE_GROUP    0                ; ide interface group
-  #define IDE_SELECT   2                ; ide interface address port
-  #define IDE_DATA     3                ; ide interface data port
-  #define UART_GROUP   1                ; uart port group
-  #define UART_DATA    2                ; uart data port
-  #define UART_STATUS  3                ; uart status/command port
-  #define RTC_GROUP    2                ; real time clock group
-  #define RTC_PORT     3                ; real time clock port
-  #define SET_BAUD     9600             ; bit-bang serial fixed baud rate
-  #define FREQ_KHZ     2000             ; default processor clock frequency
-#endif
-
-#ifdef TEST
-  #define BRMK         bn2              ; branch on serial mark
-  #define BRSP         b2               ; branch on serial space
-  #define SEMK         seq              ; set serial mark
-  #define SESP         req              ; set serial space
-  #define EXP_PORT     5                ; group i/o expander port
-  #define IDE_GROUP    1                ; ide interface group
-  #define IDE_SELECT   2                ; ide interface address port
-  #define IDE_DATA     3                ; ide interface data port
-  #define UART_GROUP   4                ; uart port group
-  #define UART_DATA    6                ; uart data port
-  #define UART_STATUS  7                ; uart status/command port
-  #define RTC_GROUP    2                ; real time clock group
-  #define RTC_PORT     3                ; real time clock port
-  #define FREQ_KHZ     4000             ; default processor clock frequency
-#endif
-
-
 
             ; SCALL Register Usage
 
@@ -701,14 +601,14 @@ f_usetbd:   lbr   usetbd       ; set UART baud rate and character format
 
             ; These provide access to read and write the hardware clock in
             ; a format compatible with Elf/OS. The set routine will also
-            ; properly initialize a new chip or after a bettery replacement.
+            ; properly initialize a new chip or after a battery replacement.
 
 f_gettod:   lbr   gettod
 f_settod:   lbr   settod
 
 
             ; The rest of these extended calls are not supported and are,
-            ; I believe, only used by the Elf2K. There are in the Pico/Elf
+            ; I believe, only used by the Elf2K. They are in the Pico/Elf
             ; BIOS but hopefully no one uses them. Some are particular to
             ; NVR capability and so are not relevant when that's not present.
 
@@ -2761,172 +2661,13 @@ back:       dec   rf
             org   0fd00h
 
 #ifdef FAST_UART
-
-            ; The bread call receives a character through the serial port
-            ; waiting indefinitely. This is the core of the normal read call
-            ; and is only callable via SEP.
-
-bread:      BRMK  bread                 ; wait for start bit
-            nop
-            nop
-            nop
-            nop
-            nop
-            sex   r2
-si_b0:      BRMK  si_b0_1
-            ani   $7f
-            lbr   si_b1
-si_b0_1:    ori   080h
-            lbr   si_b1
-si_b1:      shr
-            sex   r2
-            sex   r2
-            BRMK  si_b1_1
-            ani   07fh
-            lbr   si_b2
-si_b1_1:    ori   080h
-            lbr   si_b2
-si_b2:      shr
-            sex   r2
-            sex   r2
-            BRMK  si_b2_1
-            ani   07fh
-            lbr   si_b3
-si_b2_1:    ori   080h
-            lbr   si_b3
-si_b3:      shr
-            sex   r2
-            sex   r2
-            BRMK  si_b3_1
-            ani   07fh
-            lbr   si_b4
-si_b3_1:    ori   080h
-            lbr   si_b4
-si_b4:      shr
-            sex   r2
-            sex   r2
-            BRMK  si_b4_1
-            ani   07fh
-            lbr   si_b5
-si_b4_1:    ori   080h
-            lbr   si_b5
-si_b5:      shr
-            sex   r2
-            sex   r2
-            BRMK  si_b5_1
-            ani   07fh
-            lbr   si_b6
-si_b5_1:    ori   080h
-            lbr   si_b6
-si_b6:      shr
-            sex   r2
-            sex   r2
-            BRMK  si_b6_1
-            ani   07fh
-            lbr   si_b7
-si_b6_1:    ori   080h
-            lbr   si_b7
-si_b7:      shr
-            sex   r2
-            sex   r2
-            BRMK  si_b7_1
-            ani   07fh
-            lbr   si_stop
-si_b7_1:    ori   080h
-            lbr   si_stop
-si_stop:    nop
-            nop
-si_wait:    BRSP  si_wait
-
-            plo   re
-            ghi   re                    ; if echo flag clear, just return it
-            shr
-            bdf   btype
-
-            glo   re
-            sep   sret
-
-
-            ; For the 1802 MAX, bit-bang serial output is fixed at 38400 baud.
-            ; No delay timer value is required. This is inlined into
-            ; nbread but can also be called separately using SEP.
-
-btype:      glo   re
-            SESP                        ; start bit
-            sex   r2
-            sex   r2
-so_b0:      shrc
-            sex   r2
-            sex   r2
-            bdf   so_b0_1
-            SESP
-            lbr   so_b1
-so_b0_1:    SEMK
-            lbr   so_b1
-so_b1:      shrc
-            sex   r2
-            sex   r2
-            bdf   so_b1_1
-            SESP
-            lbr   so_b2
-so_b1_1:    SEMK
-            lbr   so_b2
-so_b2:      shrc
-            sex   r2
-            sex   r2
-            bdf   so_b2_1
-            SESP
-            lbr   so_b3
-so_b2_1:    SEMK
-            lbr   so_b3
-so_b3:      shrc
-            sex   r2
-            sex   r2
-            bdf   so_b3_1
-            SESP
-            lbr   so_b4
-so_b3_1:    SEMK
-            lbr   so_b4
-so_b4:      shrc
-            sex   r2
-            sex   r2
-            bdf   so_b4_1
-            SESP
-            lbr   so_b5
-so_b4_1:    SEMK
-            lbr   so_b5
-so_b5:      shrc
-            sex   r2
-            sex   r2
-            bdf   so_b5_1
-            SESP
-            lbr   so_b6
-so_b5_1:    SEMK
-            lbr   so_b6
-so_b6:      shrc
-            sex   r2
-            sex   r2
-            bdf   so_b6_1
-            SESP
-            lbr   so_b7
-so_b6_1:    SEMK
-            lbr   so_b7
-so_b7:      shrc
-            sex   r2
-            sex   r2
-            bdf   so_b7_1
-            SESP
-            lbr   so_stop
-so_b7_1:    SEMK
-            lbr   so_stop
-so_stop:    nop
-            nop
-            sex   r2
-            SEMK                        ; stop bit
-            shrc                        ; restore D
-
-            sep    sret
-
+  #if FREQ_KHZ == 4000
+    #include    fast_uart4000.asm
+  #elif FREQ_KHZ == 1790 || FREQ_KHZ == 3686
+    #include  fast_uart1790.asm
+  #else
+    #error    Fast UART not supported at this speed.
+  #endif
 #endif
 
           #if $ > 0fe00h

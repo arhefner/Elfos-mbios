@@ -33,6 +33,8 @@ idnum:      equ   0033h                 ; jump vector for f_idnum
 devbits:    equ   0036h                 ; f_getdev device present result
 clkfreq:    equ   0038h                 ; processor clock frequency in khz
 lastram:    equ   003ah                 ; f_freemem last ram address result
+type:       equ   003ch                 ; RAM vector for console output
+read:       equ   003fh                 ; RAM vector for console input
 
 scratch:    equ   0080h                 ; pre-boot scratch buffer memory
 stack:      equ   00ffh                 ; top of temporary booting stack
@@ -52,6 +54,7 @@ k_clkfreq:  equ   0470h                 ; processor clock frequency in khz
             ; happen at a hard reset and never again, so that ROM space can
             ; be paged out and replaced with RAM when booting.
 
+#ifndef NO_INIT
 
             org   0f600h
 
@@ -222,7 +225,7 @@ freqlp4:    inc   rb                    ; wait for high signal to count
             ; Multiply the result by 16/25 to get the final answer, but do
             ; it by multiplying by 4/5 twice so we don't overflow 16 bits.
             ; The calculated result will be stored after all devices are
-            ; probed inc case another device wants to override the result.
+            ; probed in case another device wants to override the result.
 
             ldi   2
             plo   rc
@@ -348,6 +351,13 @@ raminit:    sex   r3                    ; enable banked ram
             db    NO_GROUP
           #endif
 
+            ; For development purposes, NO_RAMCHECK can be defined.
+            ; This skips the RAM check and sets the last RAM address to
+            ; immediately before the resident portion of the BIOS. This
+            ; allows the BIOS to be loaded in RAM and be preserved when
+            ; loading the os.
+
+#ifndef NO_RAMCHECK
 
             ; Find the last address of RAM present in the system. The search
             ; is done with a granularity of one page; this is not reliable
@@ -398,6 +408,10 @@ scnwait:    glo   re                    ; wait until value just written
 
             bnf   scnloop
 
+#else
+            mov   rf,himem
+#endif
+
             ghi   rf
             smi   1
             str   ra
@@ -414,9 +428,6 @@ scnwait:    glo   re                    ; wait until value just written
 
             org   0f700h
 
-            ;
-            ;
-
 bootmsg:    ldi   devbits.1             ; pointer to memory variables
             phi   ra
             ldi   devbits.0
@@ -431,7 +442,7 @@ bootmsg:    ldi   devbits.1             ; pointer to memory variables
             dw    inmsg
             db    13,10
             db    13,10
-            db    'MBIOS 2.1.0',13,10
+            db    'MBIOS 3.1.0',13,10
             db    'Devices: ',0
 
             inc   ra
@@ -571,13 +582,16 @@ endinit:    equ   $
           #endif
 
 
+#endif
+
             ; The vector table at 0F800h was introduced with the Elf2K and
             ; provides some extended functionality for hardware of that
             ; platform. Where sensible, the same functions are provided here
-            ; in a compatible way to support like 1802/Mini hardware.
+            ; in a compatible way to support 1802/Mini like hardware.
 
             org   0f800h
 
+himem:      equ   $
 
             ; These theoretically provide a way to access the bit-banged UART
             ; even when another console device is selected, but the fact that
@@ -852,18 +866,6 @@ alphatst:   sdi   'Z'-'A'               ; if Z or less, yes
 
 alpharet:   glo   re                    ; restore and return
             sep   sret
-
-#ifdef FAST_UART
-
-; Output character through the 1854 UART if baud rate in RE.1 is zero by
-; jumping to UTYPE54, or through bit-banged port otherwise.
-
-type:       ghi   re
-            shr
-            lbnz  btype
-            lbr   utype
-
-#endif
 
           #if $ > 0f900h
             #error Page F800 overflow
@@ -1182,18 +1184,6 @@ numtest:    sdi   '9'-'0'
 
 numret:     glo   re                    ; restore and return
             sep   sret
-
-#ifdef FAST_UART
-
-; READ54 inputs character from the 1854 UART by jumping to UREAD54 if baud
-; rate in RE.1 is set to zero, and from the bit-banged UART otherwise.
-
-read:       ghi   re
-            shr
-            lbnz  bread
-            lbr   uread
-
-#endif 
 
           #if $ > 0fa00h
             #error Page F900 overflow
@@ -1849,33 +1839,11 @@ setbd:      ; a generic 1854 implementation.
             db    NO_GROUP
           #endif
 
-            ldi   1
-            phi   re
-            sep   sret
+            mov   rc,utype              ; set UART I/O vectors
+            mov   rd,uread
+            lbr   setio
 
 usebbang:   lbr   btimalc
-
-
-#ifndef FAST_UART
-
-; READ54 inputs character from the 1854 UART by jumping to UREAD54 if baud
-; rate in RE.1 is set to zero, and from the bit-banged UART otherwise.
-
-read:       ghi   re
-            shr
-            bnz   bread
-            br    uread
-
-
-; Output character through the 1854 UART if baud rate in RE.1 is zero by
-; jumping to UTYPE54, or through bit-banged port otherwise.
-
-type:       ghi   re
-            shr
-            bnz   btype
-            br    utype
-
-#endif
 
 ; UREAD54 inputs character from the 1854 UART and echos character to output
 ; if RE.1 bit zero is set by falling through to UTYPE54 after input.
@@ -2897,8 +2865,30 @@ sd_wr_blk:  out     SPI_CTL
             bnz     sd_error
 
             br      sd_exit
-
 #endif
+
+            ; Copy the type vector from rc and the read vector
+            ; from rd to the low-RAM I/O vectors.
+setio:      mov     rf,type
+            ldi     0c0h
+            str     rf
+            inc     rf
+            ghi     rc
+            str     rf
+            inc     rf
+            glo     rc
+            str     rf
+            inc     rf
+            ldi     0c0h
+            str     rf
+            inc     rf
+            ghi     rd
+            str     rf
+            inc     rf
+            glo     rd
+            str     rf
+
+            sep     sret
 
           #if $ > 0ff00h
             #error Page FE00 overflow
@@ -3003,7 +2993,10 @@ timekeep:   ghi   re                  ; Get final result and shift left one
             adi   2+1                 ;  add 1 to baud rate and set echo flag
 
             phi   re                  ;  then store formatted result and
-            sep   sret                ;  return to caller
+
+            mov   rc,btype            ; Store bit-bang I/O vectors
+            mov   rd,bread
+            lbr   setio
 
 
             ; Return the address of the last byte of RAM. This returns the
@@ -3016,6 +3009,7 @@ timekeep:   ghi   re                  ; Get final result and shift left one
 freemem:    ghi   re                    ; we only need to half-save for temp
             stxd
 
+#ifndef NO_OS_FREQ
             ldi   clkfreq.1             ; get address of bios variable
             phi   re
             ldi   clkfreq.0
@@ -3031,7 +3025,12 @@ freemem:    ghi   re                    ; we only need to half-save for temp
             inc   rf
             lda   re
             str   rf
-
+#else
+            ldi   lastram.1
+            phi   re
+            ldi   lastram.0
+            plo   re
+#endif
             lda   re                    ; return freemem in rf
             phi   rf
             lda   re

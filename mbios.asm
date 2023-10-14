@@ -16,6 +16,18 @@
 #include opcodes.def
 #include sysconfig.inc                  ; Hardware and Build Target Definitions
 
+#ifndef BIOS
+#define BIOS           0f800h
+#endif
+
+#ifndef INIT
+#define INIT           0f600h
+#endif
+
+#ifndef RAMBASE
+#define RAMBASE        0000h
+#endif
+
 #define IDE_SETTLE     500              ; milliseconds delay before booting
 #define UART_DETECT                     ; use uart if no bit-bang cable
 #define INIT_CON                        ; initialize console before booting
@@ -28,17 +40,17 @@ sret:       equ   r5
 
             ; Low Memory Usage
 
-findtkn:    equ   0030h                 ; jump vector for f_findtkn
-idnum:      equ   0033h                 ; jump vector for f_idnum
-devbits:    equ   0036h                 ; f_getdev device present result
-clkfreq:    equ   0038h                 ; processor clock frequency in khz
-lastram:    equ   003ah                 ; f_freemem last ram address result
-type:       equ   003ch                 ; RAM vector for console output
-read:       equ   003fh                 ; RAM vector for console input
+findtkn:    equ   RAMBASE+0030h         ; jump vector for f_findtkn
+idnum:      equ   RAMBASE+0033h         ; jump vector for f_idnum
+devbits:    equ   RAMBASE+0036h         ; f_getdev device present result
+clkfreq:    equ   RAMBASE+0038h         ; processor clock frequency in khz
+lastram:    equ   RAMBASE+003ah         ; f_freemem last ram address result
+type:       equ   RAMBASE+003ch         ; RAM vector for console output
+read:       equ   RAMBASE+003fh         ; RAM vector for console input
 
-scratch:    equ   0080h                 ; pre-boot scratch buffer memory
-stack:      equ   00ffh                 ; top of temporary booting stack
-bootpg:     equ   0100h                 ; address to load boot block to
+scratch:    equ   RAMBASE+0080h         ; pre-boot scratch buffer memory
+stack:      equ   RAMBASE+00ffh         ; top of temporary booting stack
+bootpg:     equ   RAMBASE+0100h         ; address to load boot block to
 
 
             ; Elf/OS Kernel Variables
@@ -56,7 +68,7 @@ k_clkfreq:  equ   0470h                 ; processor clock frequency in khz
 
 #ifndef NO_INIT
 
-            org   0f600h
+            org   INIT
 
 
             ; Do some basic initialization. Branching to initcall will setup
@@ -422,11 +434,7 @@ scnwait:    glo   re                    ; wait until value just written
 
             lbr   bootpg+0100h
 
-          #if $ > 0f700h
-            #error Page F600 overflow
-          #endif
-
-            org   0f700h
+            .align page
 
 bootmsg:    ldi   devbits.1             ; pointer to memory variables
             phi   ra
@@ -575,13 +583,6 @@ devname:    db  'IDE',0                 ; bit 0
             db   0
 
 endinit:    equ   $
-
-
-          #if $ > 0f800h
-            #error Page F700 overflow
-          #endif
-
-
 #endif
 
             ; The vector table at 0F800h was introduced with the Elf2K and
@@ -589,7 +590,7 @@ endinit:    equ   $
             ; platform. Where sensible, the same functions are provided here
             ; in a compatible way to support 1802/Mini like hardware.
 
-            org   0f800h
+            org   BIOS
 
 himem:      equ   $
 
@@ -867,12 +868,7 @@ alphatst:   sdi   'Z'-'A'               ; if Z or less, yes
 alpharet:   glo   re                    ; restore and return
             sep   sret
 
-          #if $ > 0f900h
-            #error Page F800 overflow
-          #endif
-
-
-            org   0f900h
+            .align page
 
             ; Converts a 16-bit number to an ASCII decimal string. This will
             ; output negative or positive numbers when called at intout, or
@@ -1185,11 +1181,7 @@ numtest:    sdi   '9'-'0'
 numret:     glo   re                    ; restore and return
             sep   sret
 
-          #if $ > 0fa00h
-            #error Page F900 overflow
-          #endif
-
-            org   0fa00h
+            .align page
 
 #ifndef MICRO_SD
 
@@ -1796,14 +1788,7 @@ retvar:     lda   re                    ; return variable value in rf
 
             sep   sret                  ; return to caller
 
-
-          #if $ > 0fb00h
-            #error Page FA00 overflow
-          #endif
-
-
-            org   0fb00h
-
+            .align page
 
             ; Initialize CDP1854 UART port and set RE to indicate UART in use.
             ; This was written for the 1802/Mini but is generic to the 1854
@@ -2294,13 +2279,7 @@ card_acmd:  glo   ra
             sep   sret
 
 #endif
-
-          #if $ > 0fc00h
-            #error Page FB00 overflow
-          #endif
-
-
-            org   0fc00h
+            .align page
 
 initcall:   ldi   call.1                ; address of scall
             phi   r4
@@ -2621,12 +2600,7 @@ back:       dec   rf
             db    8,32,8,0
             br    inloop
            
-
-          #if $ > 0fd00h
-            #error Page FC00 overflow
-          #endif
-
-            org   0fd00h
+            .align page
 
 #ifdef FAST_UART
   #if FREQ_KHZ == 4000
@@ -2638,13 +2612,9 @@ back:       dec   rf
   #endif
 #endif
 
-          #if $ > 0fe00h
-            #error Page FD00 overflow
-          #endif
-
 #ifdef MICRO_SD
 
-            org   0fe00h
+            .align page
 
 ideread:
 sdread:     ghi   ra
@@ -2890,11 +2860,7 @@ setio:      mov     rf,type
 
             sep     sret
 
-          #if $ > 0ff00h
-            #error Page FE00 overflow
-          #endif
-
-            org   0ff00h
+            .align page
 
 f_boot:     lbr   boot
 f_type:     lbr   type
@@ -3058,7 +3024,7 @@ freemem:    ghi   re                    ; we only need to half-save for temp
             ; using the 1804/5/6 extended instruction set. For now this is
             ; considered as an experimental change while impact is assessed.
 
-            org   0ffd8h
+            org   BIOS+07d8h
 
 callbr:     glo   r3
             plo   r6
@@ -3071,7 +3037,7 @@ callbr:     glo   r3
             glo   re
             sep   r3                    ; jump to called routine
 
-            org   0ffe0h
+            org   BIOS+07e0h
 
             ; Entry point for CALL here.
 
@@ -3097,7 +3063,7 @@ retbr:      irx                         ; restore next-prior return address
             glo   re                    ; restore d and jump to return
             sep   r3                    ;  address taken from r6
 
-            org   0fff1h
+            org   BIOS+07f1h
 
             ; Entry point for RET here.
 
@@ -3111,8 +3077,7 @@ ret:        plo   re                    ; save d and set x to 2
 
             br    retbr                 ; jump back to continuation
 
-
-            org   0fff9h
+            org   BIOS+07f9h
 
 version:    db    3,1,0
 chsum:      db    0,0,0,0

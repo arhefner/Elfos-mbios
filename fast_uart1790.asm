@@ -71,10 +71,16 @@ si_stop:    nop
             sex     r2
 si_wait:    BRSP    si_wait
 
-            rtn
+            plo     re
+            ghi     re                  ; if echo flag clear, just return it
+            shr
+            bdf     btype
 
-            ; For FAST_UART on a 4MHz system, bit-bang serial output is
-            ; fixed rate. No delay timer value is required. This is inlined
+            glo     re
+            sep     sret
+
+            ; For FAST_UART, bit-bang serial output is fixed rate.
+            ; No delay timer value is required. This is inlined
             ; into nbread but can also be called separately using SEP.
             ;
             ; The baud rate is dependent on the clock speed of the system. If
@@ -146,4 +152,4 @@ so_stop:    nop
             SEMK                        ;stop bit
             shrc                        ;restore D
 
-            rtn
+            sep     sret

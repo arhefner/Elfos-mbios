@@ -56,8 +56,6 @@ bootpg:     equ   RAMBASE+0100h         ; address to load boot block to
             ; Elf/OS Kernel Variables
 
 o_wrmboot:  equ   0303h                 ; kernel warm-boot reinitialization
-k_clkfreq:  equ   0470h                 ; processor clock frequency in khz
-
 
             ; The BIOS is divided into two parts, an always-resident part
             ; from F800-FFFF that is always mapped into memory and an
@@ -450,7 +448,7 @@ bootmsg:    ldi   devbits.1             ; pointer to memory variables
             dw    inmsg
             db    13,10
             db    13,10
-            db    'MBIOS 3.1.0',13,10
+            db    'MBIOS 3.2.0',13,10
             db    'Devices: ',0
 
             inc   ra
@@ -713,10 +711,6 @@ a2iend:     dec   rf                    ; back up to non-digit and return
             sep   sret
 
 
-
-
-
-
 hexin:      ldi   0                      ; clear holding register
             plo   re
 
@@ -768,9 +762,6 @@ hexone:     str   r2                     ; save value of this digit
             br    hexnext                ; loop back and check next char
 
 
-
-
-
             ; Convert 16-bit number in RD to ASCII hex reprensation into the
             ; buffer pointed to by RF. This calls hexout twice.
 
@@ -818,38 +809,6 @@ hexskp2:    adi   '0'+10
 
 hexoutr:    sep   sret
 
-
-            ; Test if D contains a symbol terminating character, that is,
-            ; a character that is not alphanumeric. This simply calls isalnum
-            ; and inverts the result. The character is returned unchanged.
- 
-isterm:     sep   scall
-            dw    isalnum
-
-            shlc
-            xri   1
-            shrc
-
-            sep   sret
-
-
-            ; Test if D contains an alphanumeric character, that is, 0-9,
-            ; A-Z, or a-z. If so, return DF set, otherwise DF is cleared.
-            ; The passed character is returned unchanged either way.
- 
-isalnum:    smi   '0'                   ; if less than 0, no
-            bnf   alnumret
-
-            sdi   '9'-'0'               ; if 9 or less, yes
-            bdf   alnumret
-
-            sdi   '9'-'A'               ; if A or greater, check alpha
-            bdf   alphatst
-
-alnumret:   glo   re                    ; restore and return
-            sep   sret
-
-
             ; Test if D contains an alpha character, that is, A-F or a-f.
             ; If so, return DF set, otherwise DF is cleared. The passed
             ; character is returned unchanged either way.
@@ -867,6 +826,53 @@ alphatst:   sdi   'Z'-'A'               ; if Z or less, yes
 
 alpharet:   glo   re                    ; restore and return
             sep   sret
+
+            ; Test if D contains an alphanumeric character, that is, 0-9,
+            ; A-Z, or a-z. If so, return DF set, otherwise DF is cleared.
+            ; The passed character is returned unchanged either way.
+ 
+isalnum:    smi   '0'                   ; if less than 0, no
+            bnf   alnumret
+
+            sdi   '9'-'0'               ; if 9 or less, yes
+            bdf   alnumret
+
+            sdi   '9'-'A'               ; if A or greater, check alpha
+            bdf   alphatst
+
+alnumret:   glo   re                    ; restore and return
+            sep   sret
+
+            ; Return a bitmap of devices present in the system. This now
+            ; gives devices actually present, rather than just what has
+            ; support in the BIOS. This is discovered at boot time and then
+            ; that value is returned whenever requested.
+
+            ;   0: IDE-like disk device
+            ;   1: Floppy (no longer relevant)
+            ;   2: Bit-banged serial
+            ;   3: UART-based serial
+            ;   4: Real-time clock
+            ;   5: Non-volatile RAM
+
+getdev:     ghi   re                    ; we only need to half-save for temp
+            stxd
+
+            ldi   devbits.1             ; get address of device bitmap
+            phi   re
+            ldi   devbits.0
+            plo   re
+
+retvar:     lda   re                    ; return variable value in rf
+            phi   rf
+            lda   re
+            plo   rf
+
+            inc   r2                    ; restore re.1 from temp use
+            ldn   r2
+            phi   re
+
+            sep   sret                  ; return to caller
 
             .align page
 
@@ -1551,7 +1557,9 @@ ideboot:    sep   scall                 ; initialize ide drive
 #define CS_HIGH                          02h
 
 iderst:
-sdinit:     ldi   0
+sdinit:     push  r9
+
+            ldi   0
             plo   rf
 
           #if SPI_GROUP
@@ -1720,9 +1728,9 @@ sd_init_ex: sex   r3
             sex   r2
 
             glo   rf
-            sep   sret
-
+            lskp
 error:      smi   0
+            pop   r9
             sep   sret                  ; return to caller
 
 boot:       ldi   stack.1               ; setup stack for mark opcode
@@ -1757,36 +1765,18 @@ ideboot:    sep   scall                 ; initialize ide drive
 
 #endif
 
-            ; Return a bitmap of devices present in the system. This now
-            ; gives devices actually present, rather than just what has
-            ; support in the BIOS. This is discovered at boot time and then
-            ; that value is returned whenever requested.
+            ; Test if D contains a symbol terminating character, that is,
+            ; a character that is not alphanumeric. This simply calls isalnum
+            ; and inverts the result. The character is returned unchanged.
+ 
+isterm:     sep   scall
+            dw    isalnum
 
-            ;   0: IDE-like disk device
-            ;   1: Floppy (no longer relevant)
-            ;   2: Bit-banged serial
-            ;   3: UART-based serial
-            ;   4: Real-time clock
-            ;   5: Non-volatile RAM
+            shlc
+            xri   1
+            shrc
 
-getdev:     ghi   re                    ; we only need to half-save for temp
-            stxd
-
-            ldi   devbits.1             ; get address of device bitmap
-            phi   re
-            ldi   devbits.0
-            plo   re
-
-retvar:     lda   re                    ; return variable value in rf
-            phi   rf
-            lda   re
-            plo   rf
-
-            inc   r2                    ; restore re.1 from temp use
-            ldn   r2
-            phi   re
-
-            sep   sret                  ; return to caller
+            sep   sret
 
             .align page
 
@@ -2975,28 +2965,11 @@ timekeep:   ghi   re                  ; Get final result and shift left one
 freemem:    ghi   re                    ; we only need to half-save for temp
             stxd
 
-#ifndef NO_OS_FREQ
-            ldi   clkfreq.1             ; get address of bios variable
-            phi   re
-            ldi   clkfreq.0
-            plo   re
-
-            ldi   k_clkfreq.1           ; get address of kernel variable
-            phi   rf
-            ldi   k_clkfreq.0
-            plo   rf
-
-            lda   re                    ; update kernel with clock freq
-            str   rf
-            inc   rf
-            lda   re
-            str   rf
-#else
             ldi   lastram.1
             phi   re
             ldi   lastram.0
             plo   re
-#endif
+
             lda   re                    ; return freemem in rf
             phi   rf
             lda   re
@@ -3079,6 +3052,5 @@ ret:        plo   re                    ; save d and set x to 2
 
             org   BIOS+07f9h
 
-version:    db    3,1,0
+version:    db    3,2,0
 chsum:      db    0,0,0,0
-
